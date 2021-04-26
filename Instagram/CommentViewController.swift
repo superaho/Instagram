@@ -1,33 +1,35 @@
 //
-//  HomeViewController.swift
+//  CommentViewController.swift
 //  Instagram
 //
-//  Created by PC-SYSKAI553 on 2021/04/22.
+//  Created by PC-SYSKAI553 on 2021/04/26.
 //
 
 import UIKit
 import Firebase
 
-class HomeViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
-
-    @IBOutlet weak var tableView: UITableView!
+class CommentViewController: UIViewController, UITableViewDelegate, UITableViewDataSource {
+    
+    @IBOutlet weak var tableview: UITableView!
+    @IBOutlet weak var textfield: UITextField!
     
     var postArray: [PostData] = []
+    var postData: PostData!
     
     // Firestoreのリスナー
     var listener: ListenerRegistration?
-    
+
     override func viewDidLoad() {
         super.viewDidLoad()
 
         // Do any additional setup after loading the view.
         
-        tableView.delegate = self
-        tableView.dataSource = self
+        tableview.delegate = self
+        tableview.dataSource = self
         
         // カスタムセルを登録する
         let nib = UINib(nibName: "PostTableViewCell", bundle: nil)
-        tableView.register(nib, forCellReuseIdentifier: "Cell")
+        tableview.register(nib, forCellReuseIdentifier: "Cell")
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -44,12 +46,13 @@ class HomeViewController: UIViewController, UITableViewDataSource, UITableViewDe
                 }
                 // 取得したdocumentをもとにPostDataを作成し、postArrayの配列にする。
                 self.postArray = querySnapshot!.documents.map { document in
-                    print("DEBUG_PRINT: document取得 \(document.documentID)")
-                    let postData = PostData(document: document)
-                    return postData
+                    if self.postData.id == document.documentID {
+                        self.postData = PostData(document: document)
+                    }
+                    return self.postData
                 }
                 // TableViewの表示を更新する
-                self.tableView.reloadData()
+                self.tableview.reloadData()
             }
         }
     }
@@ -61,28 +64,22 @@ class HomeViewController: UIViewController, UITableViewDataSource, UITableViewDe
         listener?.remove()
     }
     
+    
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return postArray.count
+        return 1
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         // セルを取得してデータを設定する
         let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath) as! PostTableViewCell
-        cell.setPostData(postArray[indexPath.row])
+        cell.selectionStyle = .none
+        cell.CommentButton.isHidden = true
+        cell.setPostData(postData)
         cell.likeButton.addTarget(self, action:#selector(handleButton(_:forEvent:)), for: .touchUpInside)
-        cell.CommentButton.addTarget(self, action:#selector(CommentButton(_:forEvent:)), for: .touchUpInside)
         return cell
     }
     
     @objc func handleButton(_ sender: UIButton, forEvent event: UIEvent) {
-        // タップされたセルのインデックスを求める
-        let touch = event.allTouches?.first
-        let point = touch!.location(in: self.tableView)
-        let indexPath = tableView.indexPathForRow(at: point)
-        
-        // 配列からタップされたインデックスのデータを取り出す
-        let postData = postArray[indexPath!.row]
-
         // likesを更新する
         if let myid = Auth.auth().currentUser?.uid {
             // 更新データを作成する
@@ -100,18 +97,17 @@ class HomeViewController: UIViewController, UITableViewDataSource, UITableViewDe
         }
     }
     
-    @objc func CommentButton(_ sender: UIButton, forEvent event: UIEvent) {
-        let commentViewContriller = storyboard!.instantiateViewController(identifier: "comment") as! CommentViewController
-        // タップされたセルのインデックスを求める
-        let touch = event.allTouches?.first
-        let point = touch!.location(in: self.tableView)
-        let indexPath = tableView.indexPathForRow(at: point)
+    @IBAction func firmbutton(_ sender: Any) {
+        let user = Auth.auth().currentUser
+        var updateValue: FieldValue
+        let comment = user!.displayName! + ": " + textfield.text!
         
-        // 配列からタップされたインデックスのデータを取り出す
-        let postData = postArray[indexPath!.row]
-        commentViewContriller.postData = postData
-        present(commentViewContriller, animated: true, completion: nil)
+        updateValue = FieldValue.arrayUnion([comment])
+        let postRef = Firestore.firestore().collection(Const.PostPath).document(postData.id)
+        postRef.updateData(["comment" : updateValue])
     }
+    
+    
 
     /*
     // MARK: - Navigation
